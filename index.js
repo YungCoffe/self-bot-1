@@ -1,28 +1,35 @@
-const { Client } = require('discord.js-selfbot-v13');
-const { onMessage } = require('./commands');
+const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
-// --- Servidor Web para o Render não desligar o bot ---
+// Servidor web pro Render não desligar o bot
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot oficial online!'));
+app.listen(process.env.PORT || 3000);
 
-app.get('/', (req, res) => {
-  res.send('Self-bot está online e ativo!');
+// Configuração do Bot Oficial
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+  ]
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor web a correr na porta ${PORT}`);
+client.once('ready', () => {
+  console.log(`🤖 Bot oficial logado como: ${client.user.tag}`);
 });
 
-// --- Configuração do Self-Bot ---
-const client = new Client({ checkUpdate: false });
-
-client.on('ready', () => {
-  console.log(`Self-bot ligado com sucesso na conta: ${client.user.tag}`);
-});
-
+// Resposta de comandos simples
 client.on('messageCreate', async (message) => {
-  await onMessage(message);
+  if (message.author.bot || !message.content.startsWith('!')) return;
+
+  const args = message.content.slice(1).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
+
+  if (command === 'ping') {
+    message.reply('🏓 Pong! Bot oficial rodando 100% liso e seguro.');
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
