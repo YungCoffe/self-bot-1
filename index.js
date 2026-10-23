@@ -23,7 +23,7 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Servidor web na porta ${PORT}`);
+  console.log(`🌐 Servidor web rodando na porta ${PORT}`);
 });
 
 // ===== CLIENTE DISCORD =====
@@ -38,13 +38,14 @@ const client = new Client({
 
 // ===== EVENTOS =====
 client.once('ready', async () => {
-  console.log(`🤖 Logado como: ${client.user.tag}`);
-  console.log(`📊 Servidores: ${client.guilds.cache.size}`);
+  console.log(`🤖 Bot logado com sucesso como: ${client.user.tag}`);
+  console.log(`📊 Servidores conectados: ${client.guilds.cache.size}`);
   
-  // Registra slash commands
-  // Para desenvolvimento rápido, use: registerSlashCommands(client, 'ID_DO_SERVIDOR')
-  // Para produção (global): registerSlashCommands(client)
-  await registerSlashCommands(client);
+  try {
+    await registerSlashCommands(client);
+  } catch (err) {
+    console.error('❌ Erro ao registrar Slash Commands no ready:', err);
+  }
   
   // Status do bot
   client.user.setActivity('?help | /help', { type: 'WATCHING' });
@@ -54,7 +55,7 @@ client.on('messageCreate', async (message) => {
   try {
     await onMessage(message);
   } catch (err) {
-    console.error('Erro no messageCreate:', err);
+    console.error('❌ Erro no evento messageCreate:', err);
   }
 });
 
@@ -64,31 +65,30 @@ client.on('interactionCreate', async (interaction) => {
   try {
     await handleSlashCommand(interaction);
   } catch (err) {
-    console.error('Erro no interactionCreate:', err);
+    console.error('❌ Erro no evento interactionCreate:', err);
     
-    // Responde ao usuário se ainda não respondeu
+    const errorResponse = { content: '❌ Erro interno ao executar o comando.', ephemeral: true };
     if (interaction.deferred || interaction.replied) {
-      await interaction.followUp({ content: '❌ Erro interno ao executar comando.', ephemeral: true }).catch(() => {});
+      await interaction.followUp(errorResponse).catch(() => {});
     } else {
-      await interaction.reply({ content: '❌ Erro interno ao executar comando.', ephemeral: true }).catch(() => {});
+      await interaction.reply(errorResponse).catch(() => {});
     }
   }
 });
 
-// Tratamento de erros não capturados
+// Tratamento de rejeições não tratadas
 process.on('unhandledRejection', (err) => {
-  console.error('Erro não tratado:', err);
+  console.error('❌ Rejeição não tratada capturada:', err);
 });
 
-// ===== TESTE DIRETO =====
-const TOKEN_TESTE = 'MTU2MzMwNjAyNjg5ODI5MjgzNg.Gpcfsu.RFlqo0HkDwy_QB_MPqgQN8tEJ-JvCyEgSOshYU';
+// ===== LOGIN SEGURO =====
+const token = process.env.DISCORD_TOKEN;
 
-console.log('🚀 Iniciando processo de login...');
-
-client.login(TOKEN_TESTE)
-  .then(() => {
-    console.log('✅ LOGIN COM SUCESSO!');
-  })
-  .catch(err => {
-    console.error('❌ ERRO NO LOGIN DO DISCORD:', err.message);
+if (!token) {
+  console.error('❌ ERRO CRÍTICO: A variável de ambiente DISCORD_TOKEN não está definida no Render!');
+} else {
+  console.log('🔑 Token detectado nas variáveis de ambiente. Autenticando no Discord...');
+  client.login(token).catch(err => {
+    console.error('❌ FALHA AO FAZER LOGIN NO DISCORD:', err);
   });
+}
