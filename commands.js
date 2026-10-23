@@ -76,7 +76,6 @@ async function notifyUser(member, punishment, reason, duration = null, guildName
     await member.send({ embeds: [embed] });
     return true;
   } catch (err) {
-    // Usuário com DM fechada
     return false;
   }
 }
@@ -87,7 +86,7 @@ function handleHelp(message) {
     '📌 **Comandos Disponíveis:**',
     '',
     '**Moderação:**',
-    '• `?mute @usuario <tempo> [motivo]` — Silencia (tempo: 10m, 2h, 1d)',
+    '• `?mute @usuario <tempo> [motivo]` — Silencia (ex: 10m, 2h, 1d)',
     '• `?unmute @usuario` — Remove silêncio',
     '• `?kick @usuario [motivo]` — Expulsa',
     '• `?ban @usuario [motivo]` — Bane permanentemente',
@@ -98,6 +97,9 @@ function handleHelp(message) {
     '',
     '**Utilidades:**',
     '• `?help` — Mostra esta lista',
+    '• `?ping` — Mostra a latência',
+    '• `?say <texto>` — Faz o bot falar',
+    '• `?avatar [@usuario]` — Mostra o avatar',
     '• `?flood <quantidade> <texto>` — Envia mensagens repetidas',
     '',
     '**Censura:**',
@@ -140,11 +142,10 @@ async function handleMute(message, args) {
     await member.timeout(timeMs, reason);
     mutedUsers.add(userId);
     
-    // Notificar no privado
     const notified = await notifyUser(member, 'silenciado', reason, timeMs, message.guild.name);
     
     let response = `🔇 <@${userId}> silenciado por ${formatTime(timeMs)}. Motivo: ${reason}`;
-    if (!notified) response += '\n⚠️ Não foi possível enviar DM (usuário com privado fechado).';
+    if (!notified) response += '\n⚠️ Não foi possível enviar DM.';
     
     return sendMessage(message.channel, response);
   } catch (err) {
@@ -170,8 +171,6 @@ async function handleUnmute(message, args) {
   try {
     await member.timeout(null);
     mutedUsers.delete(userId);
-    
-    // Notificar no privado
     await notifyUser(member, 'desmutado', 'Sua punição foi removida.', null, message.guild.name);
     
     return sendMessage(message.channel, `🔊 <@${userId}> pode falar novamente.`);
@@ -198,13 +197,11 @@ async function handleKick(message, args) {
   }
 
   try {
-    // Notificar ANTES de kickar (depois não consegue)
     const notified = await notifyUser(member, 'expulso', reason, null, message.guild.name);
-    
     await member.kick(reason);
     
     let response = `👢 <@${userId}> expulso. Motivo: ${reason}`;
-    if (!notified) response += '\n⚠️ Não foi possível enviar DM (usuário com privado fechado).';
+    if (!notified) response += '\n⚠️ Não foi possível enviar DM.';
     
     return sendMessage(message.channel, response);
   } catch (err) {
@@ -230,13 +227,11 @@ async function handleBan(message, args) {
   }
 
   try {
-    // Notificar ANTES de banir
     const notified = await notifyUser(member, 'banido permanentemente', reason, null, message.guild.name);
-    
     await member.ban({ reason });
     
     let response = `🔨 <@${userId}> banido permanentemente. Motivo: ${reason}`;
-    if (!notified) response += '\n⚠️ Não foi possível enviar DM (usuário com privado fechado).';
+    if (!notified) response += '\n⚠️ Não foi possível enviar DM.';
     
     return sendMessage(message.channel, response);
   } catch (err) {
@@ -254,7 +249,7 @@ async function handleTempBan(message, args) {
   const timeMs = parseTime(timeStr);
 
   if (!userId || !timeMs) {
-    return sendMessage(message.channel, '❌ Use: `?tempban @usuario <tempo> [motivo]`\nExemplo: `?tempban @user 7d Raid`');
+    return sendMessage(message.channel, '❌ Use: `?tempban @usuario <tempo> [motivo]`');
   }
 
   const reason = args.slice(2).join(' ') || 'Sem motivo especificado';
@@ -265,18 +260,14 @@ async function handleTempBan(message, args) {
   }
 
   try {
-    // Notificar ANTES de banir
     const notified = await notifyUser(member, 'banido temporariamente', reason, timeMs, message.guild.name);
-    
     await member.ban({ reason: `[TempBan ${formatTime(timeMs)}] ${reason}` });
     
-    // Agenda o unban
     const timeoutId = setTimeout(async () => {
       try {
         await message.guild.members.unban(userId);
         tempBans.delete(userId);
         
-        // Tentar notificar o desban
         try {
           const user = await message.client.users.fetch(userId);
           await user.send({
@@ -287,21 +278,19 @@ async function handleTempBan(message, args) {
               timestamp: new Date()
             }]
           });
-        } catch (dmErr) {
-          // DM fechada, ignora
-        }
+        } catch (dmErr) {}
         
         const channel = message.guild.systemChannel || message.channel;
         channel.send(`✅ <@${userId}> foi desbanido automaticamente após ${formatTime(timeMs)}.`);
       } catch (err) {
-        console.error('Erro ao desbanir automaticamente:', err);
+        console.error('Erro ao desbanir:', err);
       }
     }, timeMs);
     
     tempBans.set(userId, timeoutId);
     
     let response = `🔨 <@${userId}> banido por ${formatTime(timeMs)}. Motivo: ${reason}`;
-    if (!notified) response += '\n⚠️ Não foi possível enviar DM (usuário com privado fechado).';
+    if (!notified) response += '\n⚠️ Não foi possível enviar DM.';
     
     return sendMessage(message.channel, response);
   } catch (err) {
@@ -322,14 +311,12 @@ async function handleUnban(message, args) {
   try {
     await message.guild.members.unban(userId);
     
-    // Cancela unban automático se existir
     const timeoutId = tempBans.get(userId);
     if (timeoutId) {
       clearTimeout(timeoutId);
       tempBans.delete(userId);
     }
     
-    // Tentar notificar
     try {
       const user = await message.client.users.fetch(userId);
       await user.send({
@@ -340,13 +327,11 @@ async function handleUnban(message, args) {
           timestamp: new Date()
         }]
       });
-    } catch (dmErr) {
-      // DM fechada
-    }
+    } catch (dmErr) {}
     
     return sendMessage(message.channel, `✅ Usuário ${userId} desbanido.`);
   } catch (err) {
-    return sendMessage(message.channel, '❌ Erro ao desbanir. Verifique o ID.');
+    return sendMessage(message.channel, '❌ Erro ao desbanir.');
   }
 }
 
@@ -368,7 +353,6 @@ async function handleWarn(message, args) {
   const total = warnedUsers.get(userId);
   let response = `⚠️ <@${userId}> advertido. Motivo: ${reason}\nTotal: ${total} warn(s)`;
 
-  // Notificar no privado
   const member = getMember(message, userId);
   let autoMuted = false;
   
@@ -395,7 +379,7 @@ async function handleWarn(message, args) {
     try {
       await member.send({ embeds: [warnEmbed] });
     } catch (err) {
-      response += '\n⚠️ Não foi possível enviar DM (usuário com privado fechado).';
+      response += '\n⚠️ Não foi possível enviar DM.';
     }
   }
 
@@ -426,7 +410,6 @@ function handleCensurar(message, args) {
 
   censoredUsers.add(userId);
   
-  // Notificar
   const member = getMember(message, userId);
   if (member) {
     notifyUser(member, 'censurado', 'Suas mensagens serão automaticamente deletadas.', null, message.guild.name)
@@ -452,7 +435,6 @@ function handleDescensurar(message, args) {
 
   censoredUsers.delete(userId);
   
-  // Notificar
   const member = getMember(message, userId);
   if (member) {
     notifyUser(member, 'descensurado', 'Sua censura foi removida.', null, message.guild.name)
@@ -511,7 +493,7 @@ function handleAvatar(message, args) {
   return sendMessage(message.channel, user.displayAvatarURL({ size: 256 }));
 }
 
-// ===== REGISTRO DOS COMANDOS LEGACY =====
+// ===== MAPA DOS COMANDOS LEGACY =====
 const commands = {
   help: handleHelp,
   ping: handlePing,
@@ -534,80 +516,22 @@ const commands = {
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 
 const slashCommands = [
-  new SlashCommandBuilder()
-    .setName('mute')
-    .setDescription('Silencia um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a silenciar').setRequired(true))
-    .addStringOption(opt => opt.setName('tempo').setDescription('Tempo (ex: 10m, 2h, 1d)').setRequired(true))
-    .addStringOption(opt => opt.setName('motivo').setDescription('Motivo do mute'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
-    
-  new SlashCommandBuilder()
-    .setName('unmute')
-    .setDescription('Remove o silêncio de um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a desmutar').setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
-    
-  new SlashCommandBuilder()
-    .setName('kick')
-    .setDescription('Expulsa um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a expulsar').setRequired(true))
-    .addStringOption(opt => opt.setName('motivo').setDescription('Motivo'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
-    
-  new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Bane um usuário permanentemente')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a banir').setRequired(true))
-    .addStringOption(opt => opt.setName('motivo').setDescription('Motivo'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
-    
-  new SlashCommandBuilder()
-    .setName('tempban')
-    .setDescription('Bane um usuário temporariamente')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a banir').setRequired(true))
-    .addStringOption(opt => opt.setName('tempo').setDescription('Tempo (ex: 7d, 12h)').setRequired(true))
-    .addStringOption(opt => opt.setName('motivo').setDescription('Motivo'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
-    
-  new SlashCommandBuilder()
-    .setName('warn')
-    .setDescription('Adverte um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário a advertir').setRequired(true))
-    .addStringOption(opt => opt.setName('motivo').setDescription('Motivo'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
-    
-  new SlashCommandBuilder()
-    .setName('warns')
-    .setDescription('Mostra as advertências de um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)),
-    
-  new SlashCommandBuilder()
-    .setName('ping')
-    .setDescription('Mostra a latência do bot'),
-    
-  new SlashCommandBuilder()
-    .setName('say')
-    .setDescription('Faz o bot falar')
-    .addStringOption(opt => opt.setName('mensagem').setDescription('Mensagem').setRequired(true)),
-    
-  new SlashCommandBuilder()
-    .setName('censurar')
-    .setDescription('Ativa censura em um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
-    
-  new SlashCommandBuilder()
-    .setName('descensurar')
-    .setDescription('Remove censura de um usuário')
-    .addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+  new SlashCommandBuilder().setName('mute').setDescription('Silencia um usuário').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).addStringOption(opt => opt.setName('tempo').setDescription('Tempo (ex: 10m, 2h)').setRequired(true)).addStringOption(opt => opt.setName('motivo').setDescription('Motivo')).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('unmute').setDescription('Remove silêncio').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('kick').setDescription('Expulsa um usuário').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).addStringOption(opt => opt.setName('motivo').setDescription('Motivo')).setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+  new SlashCommandBuilder().setName('ban').setDescription('Bane permanentemente').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).addStringOption(opt => opt.setName('motivo').setDescription('Motivo')).setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+  new SlashCommandBuilder().setName('tempban').setDescription('Bane temporariamente').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).addStringOption(opt => opt.setName('tempo').setDescription('Tempo')).addStringOption(opt => opt.setName('motivo').setDescription('Motivo')).setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+  new SlashCommandBuilder().setName('warn').setDescription('Adverte um usuário').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).addStringOption(opt => opt.setName('motivo').setDescription('Motivo')).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('warns').setDescription('Mostra advertências').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)),
+  new SlashCommandBuilder().setName('ping').setDescription('Latência do bot'),
+  new SlashCommandBuilder().setName('say').setDescription('Faz o bot falar').addStringOption(opt => opt.setName('mensagem').setDescription('Mensagem').setRequired(true)),
+  new SlashCommandBuilder().setName('censurar').setDescription('Ativa censura').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+  new SlashCommandBuilder().setName('descensurar').setDescription('Remove censura').addUserOption(opt => opt.setName('usuario').setDescription('Usuário').setRequired(true)).setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
 ];
 
 // ===== HANDLER DE SLASH COMMANDS =====
 async function handleSlashCommand(interaction) {
   const { commandName, options, guild, channel } = interaction;
-  
   await interaction.deferReply();
   
   try {
@@ -617,203 +541,97 @@ async function handleSlashCommand(interaction) {
         const timeStr = options.getString('tempo');
         const reason = options.getString('motivo') || 'Sem motivo';
         const timeMs = parseTime(timeStr);
-        
-        if (!timeMs) {
-          return interaction.editReply('❌ Formato de tempo inválido. Use: 10m, 2h, 1d');
-        }
+        if (!timeMs) return interaction.editReply('❌ Tempo inválido.');
         
         const targetMember = await guild.members.fetch(user.id);
         await targetMember.timeout(timeMs, reason);
         mutedUsers.add(user.id);
         
-        // Notificar DM
         const notified = await notifyUser(targetMember, 'silenciado', reason, timeMs, guild.name);
-        
-        let response = `🔇 ${user} silenciado por ${formatTime(timeMs)}. Motivo: ${reason}`;
-        if (!notified) response += '\n⚠️ DM fechada, não foi possível notificar.';
-        
-        return interaction.editReply(response);
+        let resp = `🔇 ${user} silenciado por ${formatTime(timeMs)}.`;
+        if (!notified) resp += '\n⚠️ DM fechada.';
+        return interaction.editReply(resp);
       }
-      
       case 'unmute': {
         const user = options.getUser('usuario');
         const targetMember = await guild.members.fetch(user.id);
         await targetMember.timeout(null);
         mutedUsers.delete(user.id);
-        
-        await notifyUser(targetMember, 'desmutado', 'Sua punição foi removida.', null, guild.name);
-        
-        return interaction.editReply(`🔊 ${user} pode falar novamente.`);
+        await notifyUser(targetMember, 'desmutado', 'Punição removida.', null, guild.name);
+        return interaction.editReply(`🔊 ${user} desmutado.`);
       }
-      
       case 'kick': {
         const user = options.getUser('usuario');
         const reason = options.getString('motivo') || 'Sem motivo';
         const targetMember = await guild.members.fetch(user.id);
-        
-        const notified = await notifyUser(targetMember, 'expulso', reason, null, guild.name);
+        await notifyUser(targetMember, 'expulso', reason, null, guild.name);
         await targetMember.kick(reason);
-        
-        let response = `👢 ${user} expulso. Motivo: ${reason}`;
-        if (!notified) response += '\n⚠️ DM fechada, não foi possível notificar.';
-        
-        return interaction.editReply(response);
+        return interaction.editReply(`👢 ${user} expulso.`);
       }
-      
       case 'ban': {
         const user = options.getUser('usuario');
         const reason = options.getString('motivo') || 'Sem motivo';
         const targetMember = await guild.members.fetch(user.id);
-        
-        const notified = await notifyUser(targetMember, 'banido permanentemente', reason, null, guild.name);
+        await notifyUser(targetMember, 'banido permanentemente', reason, null, guild.name);
         await targetMember.ban({ reason });
-        
-        let response = `🔨 ${user} banido permanentemente. Motivo: ${reason}`;
-        if (!notified) response += '\n⚠️ DM fechada, não foi possível notificar.';
-        
-        return interaction.editReply(response);
+        return interaction.editReply(`🔨 ${user} banido.`);
       }
-      
       case 'tempban': {
         const user = options.getUser('usuario');
         const timeStr = options.getString('tempo');
         const reason = options.getString('motivo') || 'Sem motivo';
         const timeMs = parseTime(timeStr);
-        
-        if (!timeMs) {
-          return interaction.editReply('❌ Formato de tempo inválido.');
-        }
+        if (!timeMs) return interaction.editReply('❌ Tempo inválido.');
         
         const targetMember = await guild.members.fetch(user.id);
-        const notified = await notifyUser(targetMember, 'banido temporariamente', reason, timeMs, guild.name);
+        await notifyUser(targetMember, 'banido temporariamente', reason, timeMs, guild.name);
         await targetMember.ban({ reason: `[TempBan] ${reason}` });
         
         setTimeout(async () => {
           try {
             await guild.members.unban(user.id);
-            
-            // Notificar desban
-            try {
-              await user.send({
-                embeds: [{
-                  color: 0x00ff00,
-                  title: '✅ Você foi desbanido',
-                  description: `Seu banimento em **${guild.name}** expirou.`,
-                  timestamp: new Date()
-                }]
-              });
-            } catch (dmErr) {}
-            
-            channel.send(`✅ ${user} foi desbanido automaticamente.`);
-          } catch (err) {
-            console.error(err);
-          }
+            channel.send(`✅ ${user} desbanido automaticamente.`);
+          } catch (e) {}
         }, timeMs);
         
-        let response = `🔨 ${user} banido por ${formatTime(timeMs)}. Motivo: ${reason}`;
-        if (!notified) response += '\n⚠️ DM fechada, não foi possível notificar.';
-        
-        return interaction.editReply(response);
+        return interaction.editReply(`🔨 ${user} banido temporariamente.`);
       }
-      
       case 'warn': {
         const user = options.getUser('usuario');
         const reason = options.getString('motivo') || 'Sem motivo';
-        
         const current = warnedUsers.get(user.id) || 0;
         warnedUsers.set(user.id, current + 1);
         
-        let response = `⚠️ ${user} advertido. Motivo: ${reason}\nTotal: ${current + 1} warn(s)`;
-        
         const targetMember = await guild.members.fetch(user.id);
-        let autoMuted = false;
-        
         if (current + 1 >= 3) {
-          await targetMember.timeout(3600000, '3 advertências');
+          await targetMember.timeout(3600000, '3 warns');
           mutedUsers.add(user.id);
-          autoMuted = true;
-          response += '\n🔇 Silenciado por 1 hora (3 warns).';
         }
-        
-        // Notificar DM
-        try {
-          const warnEmbed = new EmbedBuilder()
-            .setColor(0xffff00)
-            .setTitle('⚠️ Você recebeu uma advertência')
-            .addFields(
-              { name: '📋 Motivo', value: reason, inline: false },
-              { name: '📊 Total de warns', value: `${current + 1}/3`, inline: true },
-              { name: '🏰 Servidor', value: guild.name, inline: true }
-            )
-            .setTimestamp();
-          
-          if (autoMuted) {
-            warnEmbed.addFields({ name: '🔇 Consequência', value: 'Silenciado por 1 hora', inline: false });
-          }
-          
-          await user.send({ embeds: [warnEmbed] });
-        } catch (err) {
-          response += '\n⚠️ DM fechada, não foi possível notificar.';
-        }
-        
-        return interaction.editReply(response);
+        return interaction.editReply(`⚠️ ${user} advertido (${current + 1}/3).`);
       }
-      
       case 'warns': {
         const user = options.getUser('usuario');
         const total = warnedUsers.get(user.id) || 0;
         return interaction.editReply(`⚠️ ${user} tem ${total} advertência(s).`);
       }
-      
       case 'ping': {
-        const latency = Date.now() - interaction.createdTimestamp;
-        return interaction.editReply(`🏓 Pong! ${latency}ms`);
+        return interaction.editReply(`🏓 Pong! ${Date.now() - interaction.createdTimestamp}ms`);
       }
-      
       case 'say': {
-        const text = options.getString('mensagem');
-        return interaction.editReply(text);
+        return interaction.editReply(options.getString('mensagem'));
       }
-      
       case 'censurar': {
-        const user = options.getUser('usuario');
-        censoredUsers.add(user.id);
-        
-        try {
-          await user.send({
-            embeds: [{
-              color: 0xff0000,
-              title: '🚫 Você foi censurado',
-              description: `Suas mensagens em **${guild.name}** serão automaticamente deletadas.`,
-              timestamp: new Date()
-            }]
-          });
-        } catch (err) {}
-        
-        return interaction.editReply(`🚫 Censura ativada para ${user}.`);
+        censoredUsers.add(options.getUser('usuario').id);
+        return interaction.editReply(`🚫 Censura ativada.`);
       }
-      
       case 'descensurar': {
-        const user = options.getUser('usuario');
-        censoredUsers.delete(user.id);
-        
-        try {
-          await user.send({
-            embeds: [{
-              color: 0x00ff00,
-              title: '✅ Você foi descensurado',
-              description: `Sua censura em **${guild.name}** foi removida.`,
-              timestamp: new Date()
-            }]
-          });
-        } catch (err) {}
-        
-        return interaction.editReply(`✅ Censura desativada para ${user}.`);
+        censoredUsers.delete(options.getUser('usuario').id);
+        return interaction.editReply(`✅ Censura desativada.`);
       }
     }
   } catch (err) {
     console.error(err);
-    return interaction.editReply('❌ Erro ao executar o comando.');
+    return interaction.editReply('❌ Erro ao executar comando.');
   }
 }
 
@@ -821,19 +639,8 @@ async function handleSlashCommand(interaction) {
 async function onMessage(message) {
   if (message.author.bot) return;
 
-  // Censura
-  if (censoredUsers.has(message.author.id)) {
-    try {
-      await message.delete();
-    } catch (err) {}
-    return;
-  }
-
-  // Mute local
-  if (mutedUsers.has(message.author.id)) {
-    try {
-      await message.delete();
-    } catch (err) {}
+  if (censoredUsers.has(message.author.id) || mutedUsers.has(message.author.id)) {
+    try { await message.delete(); } catch (err) {}
     return;
   }
 
@@ -857,8 +664,11 @@ async function onMessage(message) {
 async function registerSlashCommands(client, guildId = null) {
   try {
     if (guildId) {
-      await client.guilds.cache.get(guildId)?.commands.set(slashCommands);
-      console.log(`✅ Slash commands registrados no servidor ${guildId}`);
+      const guild = client.guilds.cache.get(guildId);
+      if (guild) {
+        await guild.commands.set(slashCommands);
+        console.log(`✅ Slash commands registrados no servidor ${guildId}`);
+      }
     } else {
       await client.application.commands.set(slashCommands);
       console.log('✅ Slash commands registrados globalmente');
