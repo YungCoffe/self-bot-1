@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const express = require('express');
 const { 
   onMessage, 
@@ -48,9 +48,8 @@ client.once('ready', async () => {
     console.error('❌ Erro ao registrar Slash Commands no ready:', err);
   }
   
-  
-  // Status do bot
-  client.user.setActivity('?help | /help', { type: 'WATCHING' });
+  // Status do bot (compatível com v14)
+  client.user.setActivity('?help | /help', { type: ActivityType.Watching });
 });
 
 client.on('messageCreate', async (message) => {
