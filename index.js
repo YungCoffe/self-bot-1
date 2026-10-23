@@ -8,7 +8,7 @@ const {
 
 // ===== SERVIDOR WEB (Render/UptimeRobot) =====
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -26,7 +26,7 @@ app.listen(PORT, () => {
   console.log(`🌐 Servidor web rodando na porta ${PORT}`);
 });
 
-// ===== CLIENTE DISCORD =====
+// ===== CLIENTE DISCORD (OTIMIZADO PARA RENDER) =====
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -34,6 +34,9 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
   ],
+  rest: {
+    timeout: 60000,
+  },
   ws: {
     properties: {
       $browser: 'Discord iOS'
@@ -51,14 +54,11 @@ client.once('ready', async () => {
   console.log(`🤖 Bot logado com sucesso como: ${client.user.tag}`);
   console.log(`📊 Servidores conectados: ${client.guilds.cache.size}`);
   
-  try {
-    // Registra os Slash Commands diretamente no teu servidor
-    await registerSlashCommands(client, '1554263081180332124');
-  } catch (err) {
-    console.error('❌ Erro ao registrar Slash Commands no ready:', err);
-  }
+  // Registra em segundo plano para não travar o boot
+  registerSlashCommands(client, '1554263081180332124').catch(err => {
+    console.error('❌ Erro ao registrar Slash Commands:', err);
+  });
   
-  // Status do bot (v14)
   client.user.setActivity('?help | /help', { type: ActivityType.Watching });
 });
 
@@ -87,7 +87,6 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Tratamento de rejeições não tratadas
 process.on('unhandledRejection', (err) => {
   console.error('❌ Rejeição não tratada capturada:', err);
 });
@@ -96,21 +95,21 @@ process.on('unhandledRejection', (err) => {
 const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
-  console.error('❌ ERRO CRÍTICO: A variável de ambiente DISCORD_TOKEN não está definida no Render!');
+  console.error('❌ ERRO CRÍTICO: DISCORD_TOKEN não definido nas variáveis de ambiente!');
 } else {
-  console.log('🔑 Token detectado nas variáveis de ambiente. A tentar conectar ao Gateway...');
+  console.log('🔑 Token detectado. A tentar conectar ao Gateway...');
 
   const loginTimeout = setTimeout(() => {
-    console.error('⚠️ TIMEOUT: O Discord demorou muito a responder. Verifique as Gateway Intents no Developer Portal.');
-  }, 15000);
+    console.error('⚠️ TIMEOUT: O Discord demorou mais de 20s para responder. Verifique se o IP do Render foi limitado.');
+  }, 20000);
 
   client.login(token)
     .then(() => {
       clearTimeout(loginTimeout);
-      console.log('✅ client.login() autenticado com sucesso!');
+      console.log('✅ LOGIN REALIZADO COM SUCESSO!');
     })
     .catch(err => {
       clearTimeout(loginTimeout);
-      console.error('❌ FALHA AO FAZER LOGIN NO DISCORD:', err);
+      console.error('❌ ERRO FATAL NO LOGIN DO DISCORD:', err);
     });
 }
