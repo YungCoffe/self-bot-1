@@ -80,7 +80,15 @@ process.on('unhandledRejection', (err) => {
   console.error('Erro não tratado:', err);
 });
 
-// ===== LOGIN =====
-client.login(process.env.MEU_DISCORD_TOKEN).catch(err => {
-  console.error('❌ ERRO AO LOGAR NO DISCORD:', err);
-});
+// ===== TESTE DIRETO =====
+const TOKEN_TESTE = 'MTU2MzMwNjAyNjg5ODI5MjgzNg.Gpcfsu.RFlqo0HkDwy_QB_MPqgQN8tEJ-JvCyEgSOshYU';
+
+console.log('🚀 Iniciando processo de login...');
+
+client.login(TOKEN_TESTE)
+  .then(() => {
+    console.log('✅ LOGIN COM SUCESSO!');
+  })
+  .catch(err => {
+    console.error('❌ ERRO NO LOGIN DO DISCORD:', err.message);
+  });
