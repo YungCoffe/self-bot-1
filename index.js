@@ -81,6 +81,6 @@ process.on('unhandledRejection', (err) => {
 });
 
 // ===== LOGIN =====
-client.login(process.env.DISCORD_TOKEN).catch(err => {
+client.login(process.env.MEU_DISCORD_TOKEN).catch(err => {
   console.error('❌ ERRO AO LOGAR NO DISCORD:', err);
 });
