@@ -33,7 +33,17 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
-  ]
+  ],
+  ws: {
+    properties: {
+      $browser: 'Discord iOS'
+    }
+  }
+});
+
+// Captura erros do WebSocket
+client.on('error', (err) => {
+  console.error('❌ Erro no WebSocket do Discord:', err);
 });
 
 // ===== EVENTOS =====
@@ -42,13 +52,13 @@ client.once('ready', async () => {
   console.log(`📊 Servidores conectados: ${client.guilds.cache.size}`);
   
   try {
-    // Registra os Slash Commands diretamente no teu servidor (instantâneo)
+    // Registra os Slash Commands diretamente no teu servidor
     await registerSlashCommands(client, '1554263081180332124');
   } catch (err) {
     console.error('❌ Erro ao registrar Slash Commands no ready:', err);
   }
   
-  // Status do bot (compatível com v14)
+  // Status do bot (v14)
   client.user.setActivity('?help | /help', { type: ActivityType.Watching });
 });
 
@@ -82,14 +92,25 @@ process.on('unhandledRejection', (err) => {
   console.error('❌ Rejeição não tratada capturada:', err);
 });
 
-// ===== LOGIN SEGURO =====
+// ===== LOGIN COM DIAGNÓSTICO =====
 const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
   console.error('❌ ERRO CRÍTICO: A variável de ambiente DISCORD_TOKEN não está definida no Render!');
 } else {
-  console.log('🔑 Token detectado nas variáveis de ambiente. Autenticando no Discord...');
-  client.login(token).catch(err => {
-    console.error('❌ FALHA AO FAZER LOGIN NO DISCORD:', err);
-  });
+  console.log('🔑 Token detectado nas variáveis de ambiente. A tentar conectar ao Gateway...');
+
+  const loginTimeout = setTimeout(() => {
+    console.error('⚠️ TIMEOUT: O Discord demorou muito a responder. Verifique as Gateway Intents no Developer Portal.');
+  }, 15000);
+
+  client.login(token)
+    .then(() => {
+      clearTimeout(loginTimeout);
+      console.log('✅ client.login() autenticado com sucesso!');
+    })
+    .catch(err => {
+      clearTimeout(loginTimeout);
+      console.error('❌ FALHA AO FAZER LOGIN NO DISCORD:', err);
+    });
 }
