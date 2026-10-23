@@ -42,10 +42,12 @@ client.once('ready', async () => {
   console.log(`📊 Servidores conectados: ${client.guilds.cache.size}`);
   
   try {
-    await registerSlashCommands(client);
+    // Registra os Slash Commands diretamente no teu servidor (instantâneo)
+    await registerSlashCommands(client, '1554263081180332124');
   } catch (err) {
     console.error('❌ Erro ao registrar Slash Commands no ready:', err);
   }
+  
   
   // Status do bot
   client.user.setActivity('?help | /help', { type: 'WATCHING' });
