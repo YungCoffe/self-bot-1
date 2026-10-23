@@ -93,7 +93,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-// ===== LOGIN COM RESTART AUTOMÁTICO SE FALHAR =====
+// ===== LOGIN COM RESTART FORÇADO SE TRAVAR =====
 const token = process.env.DISCORD_TOKEN;
 
 if (!token) {
@@ -102,15 +102,23 @@ if (!token) {
 } else {
   console.log('🔑 Token detectado. A tentar conectar ao Gateway...');
 
-  const loginTimer = setTimeout(() => {
-    console.warn('⚠️ Login ainda pendente após 20s...');
-  }, 20000);
+  let loggedIn = false;
 
-  client.once('ready', () => clearTimeout(loginTimer));
+  client.once('ready', () => {
+    loggedIn = true;
+    console.log('✅ Gateway conectado com sucesso!');
+  });
+
+  const loginTimer = setTimeout(() => {
+    if (!loggedIn) {
+      console.error('❌ TIMEOUT: O WebSocket travou após 20s. A reiniciar o processo...');
+      process.exit(1); // Força o Render a reiniciar o container na hora
+    }
+  }, 20000);
 
   client.login(token).catch(err => {
     clearTimeout(loginTimer);
     console.error('❌ Erro fatal no login:', err);
-    process.exit(1); // Força o Render a reiniciar o container se a conexão falhar
+    process.exit(1);
   });
 }
