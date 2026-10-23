@@ -97,13 +97,12 @@ async function handleUnmute(message, args) {
   }
 
   try {
-    await member.timeout(null);
-    mutedUsers.delete(userId);
-    return sendMessage(message.channel, `🔊 <@${userId>} pode falar novamente.`);}
-   catch (err) {
-    return sendMessage(message.channel, 'Erro ao remover silêncio.');
+  await member.timeout(null);
+  mutedUsers.delete(userId);
+  return sendMessage(message.channel, `🔊 <@${userId}> pode falar novamente.`);
+} catch (err) {
+  return sendMessage(message.channel, 'Erro ao remover silêncio.');
   }
-}
 
 async function handleKick(message, args) {
   if (!hasModPermissions(message.member)) {
